@@ -28,6 +28,58 @@ export type Handler = (
   msg: IncomingMessage
 ) => string | Promise<string> | AsyncIterable<string>;
 
+// Minimal logger surface — `console` satisfies it. Plugins can pass their own
+// structured logger instead.
+export type Logger = {
+  info?: (msg: string, ...args: unknown[]) => void;
+  warn?: (msg: string, ...args: unknown[]) => void;
+  error?: (msg: string, ...args: unknown[]) => void;
+};
+
+export type ReconnectOptions = {
+  /** Initial backoff in ms. Default 1000. */
+  initialMs?: number;
+  /** Max backoff in ms. Default 30000. */
+  maxMs?: number;
+};
+
+export type AgentOptions = {
+  /** Long-lived ha_* token, or a plain handle for the legacy skeleton path. */
+  token: string;
+  /** Optional override; for ha_* tokens the relay resolves the handle. */
+  handle?: string;
+  /** Defaults to DEFAULT_RELAY. */
+  relayUrl?: string;
+  reconnect?: ReconnectOptions;
+  logger?: Logger;
+  /**
+   * Fired when the relay returns auth_response.ok=false (token revoked,
+   * rotated externally, agent deleted). When set, the run loop stops
+   * retrying after this fires — the situation is not transient, the caller
+   * needs to re-pair. When unset, retry-forever (legacy) behavior.
+   */
+  onAuthFailed?: (err: AuthFailedError) => void;
+};
+
+/**
+ * Thrown by Agent.connectOnce when the relay rejects the auth handshake
+ * (auth_response.ok=false). Distinct from generic socket / network errors so
+ * the run loop and onAuthFailed listeners can branch on it.
+ */
+export class AuthFailedError extends Error {
+  constructor(public detail: string) {
+    super(`auth failed: ${detail}`);
+    this.name = "AuthFailedError";
+  }
+}
+
+export type UserClientOptions = {
+  handle?: string;
+  token?: string;
+  relayUrl?: string;
+  logger?: Logger;
+};
+
 function nowMs(): number {
   return Date.now();
 }
@@ -38,16 +90,18 @@ function envBase() {
 
 abstract class BaseConn {
   protected ws?: WebSocket;
-  protected readyPromise?: Promise<void>;
   public handle: string;
+  protected logger: Logger;
 
   constructor(
     handle: string,
     protected token: string,
     protected role: number,
-    protected relayUrl: string = DEFAULT_RELAY
+    protected relayUrl: string = DEFAULT_RELAY,
+    logger?: Logger
   ) {
     this.handle = handle;
+    this.logger = logger ?? console;
   }
 
   protected async connectOnce(): Promise<void> {
@@ -58,7 +112,6 @@ abstract class BaseConn {
       ws.onopen = () => resolve();
       ws.onerror = () => reject(new Error("websocket error"));
     });
-    // Send auth
     const authFrame = encode({
       ...envBase(),
       authRequest: { token: this.token, handle: this.handle, role: this.role },
@@ -66,12 +119,12 @@ abstract class BaseConn {
     ws.send(authFrame);
     const first = await this.recvRaw();
     if (!first.authResponse || !first.authResponse.ok) {
-      throw new Error(`auth failed: ${JSON.stringify(first)}`);
+      throw new AuthFailedError(JSON.stringify(first));
     }
     if (first.authResponse.handle) this.handle = first.authResponse.handle;
   }
 
-  protected send(env: object): void {
+  protected sendEnv(env: object): void {
     if (!this.ws) throw new Error("not connected");
     this.ws.send(encode(env));
   }
@@ -103,14 +156,53 @@ abstract class BaseConn {
       ws.addEventListener("close", onClose as any);
     });
   }
+
+  protected closeSocket() {
+    try {
+      this.ws?.close();
+    } catch {
+      /* swallow */
+    }
+    this.ws = undefined;
+  }
 }
 
+/**
+ * Long-lived agent connection.
+ *
+ * Two construction styles are accepted:
+ *
+ *   new Agent("ha_token")                        // positional, legacy
+ *   new Agent("ha_token", "alice/jarvis")        // positional with handle
+ *   new Agent({ token, handle, relayUrl, logger, reconnect })
+ *
+ * The options form is preferred for new code (e.g. the OpenClaw plugin).
+ */
 export class Agent extends BaseConn {
   private handler?: Handler;
+  private reconnect: Required<ReconnectOptions>;
+  private stopped = false;
+  private onAuthFailed?: (err: AuthFailedError) => void;
 
-  constructor(token: string, handle?: string, relayUrl?: string) {
-    const h = handle ?? (token.startsWith("ha_") ? "" : token);
-    super(h, token, Role.ROLE_AGENT, relayUrl);
+  constructor(opts: AgentOptions);
+  constructor(token: string, handle?: string, relayUrl?: string);
+  constructor(
+    arg: AgentOptions | string,
+    legacyHandle?: string,
+    legacyRelayUrl?: string
+  ) {
+    const opts: AgentOptions =
+      typeof arg === "string"
+        ? { token: arg, handle: legacyHandle, relayUrl: legacyRelayUrl }
+        : arg;
+    const handle =
+      opts.handle ?? (opts.token.startsWith("ha_") ? "" : opts.token);
+    super(handle, opts.token, Role.ROLE_AGENT, opts.relayUrl, opts.logger);
+    this.reconnect = {
+      initialMs: opts.reconnect?.initialMs ?? 1000,
+      maxMs: opts.reconnect?.maxMs ?? 30_000,
+    };
+    this.onAuthFailed = opts.onAuthFailed;
   }
 
   onMessage(fn: Handler) {
@@ -118,31 +210,74 @@ export class Agent extends BaseConn {
     return fn;
   }
 
+  /** Stop the run loop after the next iteration and close the socket. */
+  stop(): void {
+    this.stopped = true;
+    this.closeSocket();
+  }
+
   async run(): Promise<void> {
-    let backoff = 1000;
-    for (;;) {
+    let backoff = this.reconnect.initialMs;
+    while (!this.stopped) {
       try {
         await this.connectOnce();
-        backoff = 1000;
+        backoff = this.reconnect.initialMs;
         await this.loop();
       } catch (e) {
-        console.warn(`[agent] connection lost: ${e}; reconnecting in ${backoff}ms`);
+        if (this.stopped) return;
+        // Auth failures are not transient — token revoked, agent deleted, or
+        // rotated externally. Surface to the caller and stop retrying when an
+        // onAuthFailed listener is registered. Without a listener we fall
+        // through to legacy retry-forever behavior so existing callers don't
+        // change shape.
+        if (e instanceof AuthFailedError && this.onAuthFailed) {
+          try {
+            this.onAuthFailed(e);
+          } catch (cbErr) {
+            this.logger.error?.(`[helloagent] onAuthFailed threw: ${cbErr}`);
+          }
+          this.stop();
+          return;
+        }
+        this.logger.warn?.(
+          `[helloagent] connection lost: ${e}; reconnecting in ${backoff}ms`
+        );
         await new Promise((r) => setTimeout(r, backoff));
-        backoff = Math.min(backoff * 2, 30_000);
+        backoff = Math.min(backoff * 2, this.reconnect.maxMs);
       }
     }
+  }
+
+  /**
+   * Send a message proactively (not as a reply). Useful for assistant-initiated
+   * outreach. Requires `await agent.run()` to have authenticated the socket
+   * already; throws if not connected.
+   */
+  send(toHandle: string, text: string, conversationId?: string): string {
+    const messageId = randomUUID();
+    this.sendEnv({
+      messageId,
+      tsUnixMs: nowMs(),
+      sendMessage: {
+        conversationId: conversationId ?? `${this.handle}:${toHandle}`,
+        fromHandle: this.handle,
+        toHandle,
+        text,
+      },
+    });
+    return messageId;
   }
 
   private async loop(): Promise<void> {
-    for (;;) {
+    while (!this.stopped) {
       const env = await this.recvRaw();
       if (env.sendMessage) {
-        void this.handle_(env);
+        void this.dispatch(env);
       }
     }
   }
 
-  private async handle_(env: any): Promise<void> {
+  private async dispatch(env: any): Promise<void> {
     const m = env.sendMessage;
     const incoming: IncomingMessage = {
       messageId: env.messageId,
@@ -151,8 +286,7 @@ export class Agent extends BaseConn {
       toHandle: m.toHandle,
       text: m.text ?? "",
     };
-    // Ack
-    this.send({ ...envBase(), ack: { refMessageId: env.messageId } });
+    this.sendEnv({ ...envBase(), ack: { refMessageId: env.messageId } });
     if (!this.handler) return;
     const result = this.handler(incoming);
     if (typeof result === "string") {
@@ -170,8 +304,13 @@ export class Agent extends BaseConn {
     this.sendChunk(incoming, env.messageId, text ?? "", true);
   }
 
-  private sendChunk(incoming: IncomingMessage, refId: string, body: string, final: boolean) {
-    this.send({
+  private sendChunk(
+    incoming: IncomingMessage,
+    refId: string,
+    body: string,
+    final: boolean
+  ) {
+    this.sendEnv({
       ...envBase(),
       streamChunk: {
         conversationId: incoming.conversationId,
@@ -186,18 +325,27 @@ export class Agent extends BaseConn {
 }
 
 export class UserClient extends BaseConn {
-  constructor(opts: { handle?: string; token?: string; relayUrl?: string }) {
+  constructor(opts: UserClientOptions) {
     const handle = opts.handle ?? "";
     const token = opts.token ?? handle;
     if (!handle && !token) throw new Error("handle or token required");
-    super(handle, token, Role.ROLE_USER, opts.relayUrl);
+    super(handle, token, Role.ROLE_USER, opts.relayUrl, opts.logger);
   }
 
   async connect() {
     await this.connectOnce();
   }
 
-  async sendMessage(toHandle: string, text: string, conversationId?: string): Promise<string> {
+  /** Stop and close the socket. */
+  stop(): void {
+    this.closeSocket();
+  }
+
+  async sendMessage(
+    toHandle: string,
+    text: string,
+    conversationId?: string
+  ): Promise<string> {
     const env = {
       ...envBase(),
       sendMessage: {
@@ -207,7 +355,7 @@ export class UserClient extends BaseConn {
         text,
       },
     };
-    this.send(env);
+    this.sendEnv(env);
     return env.messageId;
   }
 
