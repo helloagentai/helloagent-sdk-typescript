@@ -65,8 +65,9 @@ export type LinkChannelOptions = {
   /** Bearer token: a user-session JWT or an OAuth-scoped access token with channel:link. */
   token: string;
   /**
-   * User-chosen suffix for the linked agent handle. Required on first link;
-   * silently ignored on relink (the bound handle wins).
+   * User-chosen suffix for the linked agent handle. Required for each link.
+   * Reusing a suffix conflicts with the existing handle; choose another name
+   * to create another provider-backed agent.
    */
   agentName?: string;
   /** REST base URL. Defaults to DEFAULT_API. */
@@ -79,7 +80,7 @@ export type LinkChannelResponse = {
   agent_name: string;
   display_name: string;
   user_handle: string;
-  /** Long-lived ha_* token. Shown once; persist server-side. */
+  /** Long-lived ha_* token. Shown once; persist locally on the provider. */
   token: string;
   relay_ws: string;
 };
@@ -137,6 +138,9 @@ export type OAuthAuthorizeOptions = {
   redirectUri: string;
   scope?: string;
   state?: string;
+  /** PKCE S256 code challenge for public/local clients. */
+  codeChallenge?: string;
+  codeChallengeMethod?: "S256";
   apiUrl?: string;
 };
 
@@ -163,15 +167,24 @@ export async function oauthAuthorize(
       redirect_uri: opts.redirectUri,
       scope: opts.scope ?? "channel:link",
       state: opts.state ?? "",
+      ...(opts.codeChallenge
+        ? {
+            code_challenge: opts.codeChallenge,
+            code_challenge_method: opts.codeChallengeMethod ?? "S256",
+          }
+        : {}),
     }),
   })) as OAuthAuthorizeResponse;
 }
 
 export type OAuthTokenOptions = {
   clientId: string;
-  clientSecret: string;
+  /** Confidential clients may pass a secret; public clients should use PKCE. */
+  clientSecret?: string;
   code: string;
   redirectUri: string;
+  /** PKCE verifier matching the authorization request's code challenge. */
+  codeVerifier?: string;
   apiUrl?: string;
 };
 
@@ -191,8 +204,93 @@ export async function oauthExchangeToken(
     grant_type: "authorization_code",
     code: opts.code,
     client_id: opts.clientId,
-    client_secret: opts.clientSecret,
     redirect_uri: opts.redirectUri,
+  });
+  if (opts.clientSecret !== undefined) form.set("client_secret", opts.clientSecret);
+  if (opts.codeVerifier !== undefined) form.set("code_verifier", opts.codeVerifier);
+  return (await request<OAuthTokenResponse>(`${api}/oauth/token`, {
+    method: "POST",
+    headers: { "Content-Type": "application/x-www-form-urlencoded" },
+    body: form,
+  })) as OAuthTokenResponse;
+}
+
+export type OAuthDeviceAuthorizeOptions = {
+  clientId: string;
+  scope?: string;
+  apiUrl?: string;
+};
+
+export type OAuthDeviceAuthorizeResponse = {
+  device_code: string;
+  user_code: string;
+  verification_uri: string;
+  verification_uri_complete: string;
+  expires_in: number;
+  interval: number;
+};
+
+export async function oauthStartDeviceAuthorization(
+  opts: OAuthDeviceAuthorizeOptions
+): Promise<OAuthDeviceAuthorizeResponse> {
+  const api = opts.apiUrl ?? DEFAULT_API;
+  return (await request<OAuthDeviceAuthorizeResponse>(
+    `${api}/oauth/device/authorize`,
+    {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        client_id: opts.clientId,
+        scope: opts.scope ?? "channel:link",
+      }),
+    }
+  )) as OAuthDeviceAuthorizeResponse;
+}
+
+export type OAuthDeviceApproveOptions = {
+  userToken: string;
+  clientId: string;
+  userCode: string;
+  apiUrl?: string;
+};
+
+export type OAuthDeviceApproveResponse = {
+  client_id: string;
+  scope: string;
+  approved: boolean;
+};
+
+export async function oauthApproveDeviceAuthorization(
+  opts: OAuthDeviceApproveOptions
+): Promise<OAuthDeviceApproveResponse> {
+  const api = opts.apiUrl ?? DEFAULT_API;
+  return (await request<OAuthDeviceApproveResponse>(
+    `${api}/oauth/device/approve`,
+    {
+      method: "POST",
+      headers: jsonHeaders(opts.userToken),
+      body: JSON.stringify({
+        client_id: opts.clientId,
+        user_code: opts.userCode,
+      }),
+    }
+  )) as OAuthDeviceApproveResponse;
+}
+
+export type OAuthDeviceTokenOptions = {
+  clientId: string;
+  deviceCode: string;
+  apiUrl?: string;
+};
+
+export async function oauthPollDeviceToken(
+  opts: OAuthDeviceTokenOptions
+): Promise<OAuthTokenResponse> {
+  const api = opts.apiUrl ?? DEFAULT_API;
+  const form = new URLSearchParams({
+    grant_type: "urn:ietf:params:oauth:grant-type:device_code",
+    client_id: opts.clientId,
+    device_code: opts.deviceCode,
   });
   return (await request<OAuthTokenResponse>(`${api}/oauth/token`, {
     method: "POST",
