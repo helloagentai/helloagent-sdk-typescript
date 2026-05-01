@@ -1,5 +1,49 @@
 import { encode, decode, Role } from "./proto.js";
 
+/**
+ * Resolve a WebSocket constructor for the current runtime.
+ *
+ * - In the browser, use the native `globalThis.WebSocket`.
+ * - In Node, prefer the `ws` package: it auto-responds to server-initiated
+ *   WebSocket-protocol Ping frames with Pong, which the relay's heartbeat
+ *   ([relay/internal/server/server.go:147]) requires (every 25s with a 10s
+ *   pong deadline). Node's built-in WHATWG WebSocket (via undici) does not
+ *   reliably auto-Pong server pings in current Node releases, which causes
+ *   the relay to tear down the connection at the second missed ping (~60s
+ *   after connect) and the SDK reconnects in a loop.
+ * - If `ws` isn't installed in the Node deps tree, fall back to the global
+ *   so the SDK still works (just with the heartbeat caveat above).
+ *
+ * Resolved once and cached. The lookup is async because in browsers the
+ * dynamic `import("ws")` would 404 — we never reach it there because we
+ * short-circuit on the global.
+ */
+let cachedWebSocketCtor: typeof globalThis.WebSocket | null = null;
+
+async function resolveWebSocketCtor(): Promise<typeof globalThis.WebSocket> {
+  if (cachedWebSocketCtor) return cachedWebSocketCtor;
+  const isNode =
+    typeof process !== "undefined" &&
+    typeof (process as { versions?: { node?: string } }).versions?.node === "string";
+  if (isNode) {
+    try {
+      const mod = (await import("ws")) as unknown as {
+        default?: typeof globalThis.WebSocket;
+        WebSocket?: typeof globalThis.WebSocket;
+      };
+      const ctor = mod.WebSocket ?? mod.default;
+      if (ctor) {
+        cachedWebSocketCtor = ctor;
+        return ctor;
+      }
+    } catch {
+      // `ws` not installed — fall through to globalThis.WebSocket.
+    }
+  }
+  cachedWebSocketCtor = globalThis.WebSocket;
+  return cachedWebSocketCtor;
+}
+
 // Web Crypto is present in Node 19+ and all modern browsers. No Node polyfill.
 const randomUUID: () => string = () => {
   const c = (globalThis as any).crypto;
@@ -16,26 +60,61 @@ const randomUUID: () => string = () => {
 export const DEFAULT_RELAY = "ws://localhost:8080/v1/ws";
 export const DEFAULT_API = "http://localhost:8080";
 
+/**
+ * A single inbound message from a peer, normalized to a stable shape
+ * across both Node and browser runtimes.
+ *
+ * @example
+ * ```ts
+ * agent.onMessage((msg: IncomingMessage) => {
+ *   console.log(`${msg.fromHandle} → ${msg.toHandle}: ${msg.text}`);
+ *   return `you said: ${msg.text}`;
+ * });
+ * ```
+ */
 export type IncomingMessage = {
+  /** Stable per-message identifier — useful for dedup and reply-tracking. */
   messageId: string;
+  /** Groups related messages (a "thread" in chat-UI terms). */
   conversationId: string;
+  /** Sender handle, e.g. `"alice"` or `"alice/jarvis"`. */
   fromHandle: string;
+  /** Receiver handle (this agent or user). */
   toHandle: string;
+  /** Message body. */
   text: string;
 };
 
+/**
+ * Inbound message handler. Return value determines how the reply is framed:
+ *
+ * - `string` → one final `StreamChunk` (`is_final = true`).
+ * - `Promise<string>` → same, awaited.
+ * - `AsyncIterable<string>` → each yielded chunk is a separate
+ *   `StreamChunk`; the SDK appends a final empty chunk for completion.
+ *
+ * Returning an empty string is fine — peers see the reply complete (their UI
+ * un-pends) and the conversation moves on.
+ */
 export type Handler = (
   msg: IncomingMessage
 ) => string | Promise<string> | AsyncIterable<string>;
 
-// Minimal logger surface — `console` satisfies it. Plugins can pass their own
-// structured logger instead.
+/**
+ * Minimal logger surface. `console` satisfies it. Pass your own structured
+ * logger to integrate with plugin/host log systems.
+ */
 export type Logger = {
   info?: (msg: string, ...args: unknown[]) => void;
   warn?: (msg: string, ...args: unknown[]) => void;
   error?: (msg: string, ...args: unknown[]) => void;
 };
 
+/**
+ * Tunes the reconnect backoff used by `Agent.run()` / `UserClient.run()`
+ * after a transient disconnect. Backoff doubles on each consecutive failure
+ * and resets on a successful reconnect.
+ */
 export type ReconnectOptions = {
   /** Initial backoff in ms. Default 1000. */
   initialMs?: number;
@@ -43,28 +122,52 @@ export type ReconnectOptions = {
   maxMs?: number;
 };
 
+/**
+ * Constructor options for `Agent`. The only required field is `token`.
+ *
+ * @example
+ * ```ts
+ * const agent = new Agent({
+ *   token: process.env.HA_TOKEN!,
+ *   relayUrl: "wss://relay.helloagent.io/v1/ws",
+ *   onAuthFailed: (err) => process.exit(1),
+ * });
+ * ```
+ */
 export type AgentOptions = {
-  /** Long-lived ha_* token, or a plain handle for the legacy skeleton path. */
+  /** Long-lived `ha_*` token, or a plain handle for the legacy skeleton path. */
   token: string;
-  /** Optional override; for ha_* tokens the relay resolves the handle. */
+  /** Optional override; for `ha_*` tokens the relay resolves the handle from the token. */
   handle?: string;
-  /** Defaults to DEFAULT_RELAY. */
+  /** Defaults to {@link DEFAULT_RELAY}. */
   relayUrl?: string;
   reconnect?: ReconnectOptions;
   logger?: Logger;
   /**
-   * Fired when the relay returns auth_response.ok=false (token revoked,
+   * Fired when the relay returns `auth_response.ok = false` (token revoked,
    * rotated externally, agent deleted). When set, the run loop stops
-   * retrying after this fires — the situation is not transient, the caller
-   * needs to re-pair. When unset, retry-forever (legacy) behavior.
+   * retrying after this fires — the situation is not transient, re-pair.
+   * When unset, retry-forever (legacy) behavior.
    */
   onAuthFailed?: (err: AuthFailedError) => void;
 };
 
 /**
- * Thrown by Agent.connectOnce when the relay rejects the auth handshake
- * (auth_response.ok=false). Distinct from generic socket / network errors so
- * the run loop and onAuthFailed listeners can branch on it.
+ * Thrown when the relay rejects the auth handshake (`auth_response.ok=false`).
+ * Distinct from generic socket / network errors so the run loop and
+ * `onAuthFailed` listeners can branch on it.
+ *
+ * `err.detail` is the JSON-stringified `auth_response` payload.
+ *
+ * @example
+ * ```ts
+ * try { await agent.run(); }
+ * catch (err) {
+ *   if (err instanceof AuthFailedError) {
+ *     console.error("re-pair required:", err.detail);
+ *   }
+ * }
+ * ```
  */
 export class AuthFailedError extends Error {
   constructor(public detail: string) {
@@ -73,6 +176,10 @@ export class AuthFailedError extends Error {
   }
 }
 
+/**
+ * Constructor options for `UserClient` (the `ROLE_USER` counterpart of
+ * `Agent`, for browser / mobile / control-UI surfaces).
+ */
 export type UserClientOptions = {
   handle?: string;
   token?: string;
@@ -105,7 +212,8 @@ abstract class BaseConn {
   }
 
   protected async connectOnce(): Promise<void> {
-    const ws = new WebSocket(this.relayUrl);
+    const WS = await resolveWebSocketCtor();
+    const ws = new WS(this.relayUrl);
     this.ws = ws;
     ws.binaryType = "arraybuffer";
     await new Promise<void>((resolve, reject) => {
@@ -168,15 +276,45 @@ abstract class BaseConn {
 }
 
 /**
- * Long-lived agent connection.
+ * Long-lived agent connection (`ROLE_AGENT`). Authenticates with an `ha_*`
+ * token, listens for inbound peer messages, and optionally sends proactive
+ * messages back. The relay binds the handle from the token; you can read it
+ * via `agent.handle` after `auth_response` lands.
  *
  * Two construction styles are accepted:
  *
- *   new Agent("ha_token")                        // positional, legacy
- *   new Agent("ha_token", "alice/jarvis")        // positional with handle
- *   new Agent({ token, handle, relayUrl, logger, reconnect })
+ * ```ts
+ * new Agent("ha_token")                          // positional, legacy
+ * new Agent("ha_token", "alice/jarvis")          // positional with handle
+ * new Agent({ token, handle, relayUrl, logger, reconnect, onAuthFailed })
+ * ```
  *
- * The options form is preferred for new code (e.g. the OpenClaw plugin).
+ * The options form is preferred for new code.
+ *
+ * @example Echo bot
+ * ```ts
+ * const agent = new Agent({ token: process.env.HA_TOKEN! });
+ * agent.onMessage((msg) => `you said: ${msg.text}`);
+ * await agent.run();
+ * ```
+ *
+ * @example Streaming reply
+ * ```ts
+ * agent.onMessage(async function* (msg) {
+ *   for (const word of `replying to: ${msg.text}`.split(" ")) {
+ *     yield word + " ";
+ *     await new Promise((r) => setTimeout(r, 50));
+ *   }
+ * });
+ * ```
+ *
+ * @example Proactive send
+ * ```ts
+ * await agent.run();           // assumes top-level await; otherwise: void agent.run();
+ * agent.send("alice", "your build finished");
+ * ```
+ *
+ * See {@link AgentOptions}, {@link Handler}, {@link IncomingMessage}, {@link AuthFailedError}.
  */
 export class Agent extends BaseConn {
   private handler?: Handler;
@@ -324,6 +462,28 @@ export class Agent extends BaseConn {
   }
 }
 
+/**
+ * `ROLE_USER` counterpart of {@link Agent} — for browser, mobile, and
+ * control-UI surfaces that act on behalf of a logged-in user (not an
+ * autonomous agent). Same WebSocket transport, same `onMessage` / `send`
+ * shape; differs in the wire-level role the relay sees, which affects
+ * routing rules (users can target any handle; agents can only respond).
+ *
+ * Provide either `handle` (for legacy guest sessions) or `token`
+ * (a session/SSO token); the constructor throws if neither is given.
+ *
+ * @example
+ * ```ts
+ * const client = new UserClient({
+ *   handle: "alice",
+ *   token: ssoSessionToken,
+ *   relayUrl: "wss://relay.helloagent.io/v1/ws",
+ * });
+ * client.onMessage((msg) => render(msg));
+ * await client.run();
+ * client.send("alice/jarvis", "what's on my calendar?");
+ * ```
+ */
 export class UserClient extends BaseConn {
   constructor(opts: UserClientOptions) {
     const handle = opts.handle ?? "";

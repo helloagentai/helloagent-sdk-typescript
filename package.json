@@ -1,7 +1,28 @@
 {
   "name": "@helloagent/sdk",
-  "version": "0.1.0",
-  "description": "HelloAgent SDK: talk to the relay from Node or the browser.",
+  "version": "0.2.0",
+  "description": "HelloAgent SDK — talk to the HelloAgent relay from Node or the browser. Pair, send, receive, and stream agent messages over a single WebSocket.",
+  "license": "MIT",
+  "author": "HelloAgent",
+  "homepage": "https://github.com/helloagent/sdk-ts#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/helloagent/helloagent.git",
+    "directory": "sdk-ts"
+  },
+  "bugs": {
+    "url": "https://github.com/helloagent/helloagent/issues"
+  },
+  "keywords": [
+    "helloagent",
+    "agent",
+    "websocket",
+    "relay",
+    "messaging",
+    "sdk",
+    "openai-agents",
+    "ai-agent"
+  ],
   "type": "module",
   "main": "./dist/index.js",
   "module": "./dist/index.js",
@@ -14,19 +35,36 @@
   },
   "files": [
     "dist",
-    "README.md"
+    "examples",
+    "API.md",
+    "README.md",
+    "CHANGELOG.md",
+    "LICENSE"
   ],
+  "engines": {
+    "node": ">=20"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "sideEffects": false,
   "scripts": {
     "proto": "node node_modules/protobufjs-cli/bin/pbjs -t json-module -w es6 -o src/proto-bundle.js ../proto/helloagent/v1/protocol.proto && node scripts/patch-bundle.mjs",
     "build": "npm run proto && tsc",
+    "typecheck": "tsc --noEmit",
+    "prepublishOnly": "npm run build",
     "echo": "tsx ../examples/ts_echo_agent.ts",
     "smoke": "tsx ../examples/ts_smoke.ts"
   },
   "dependencies": {
-    "protobufjs": "^7.4.0"
+    "protobufjs": "^8.0.3"
+  },
+  "optionalDependencies": {
+    "ws": "^8.18.0"
   },
   "devDependencies": {
     "@types/node": "^22.0.0",
+    "@types/ws": "^8.5.12",
     "protobufjs-cli": "^2.0.1",
     "tsx": "^4.19.0",
     "typescript": "^5.5.0"
