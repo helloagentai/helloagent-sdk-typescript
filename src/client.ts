@@ -535,12 +535,31 @@ async function postJson(url: string, body: object, bearer?: string): Promise<any
   return JSON.parse(text);
 }
 
-export function registerUser(email: string, password: string, handle: string, api: string = DEFAULT_API) {
-  return postJson(`${api}/v1/auth/register`, { email, password, handle });
+// register / login were removed when HelloAgent moved user identity to
+// Supabase Auth. Use supabase-js (`supabase.auth.signUp(...)` /
+// `signInWithPassword(...)` / `signInWithOAuth(...)`) to obtain an access
+// token, then pass it to `new UserClient({ token, handle })`. First-time
+// users must claim a handle via `POST /v1/profile` (see `claimHandle`
+// below) before the WebSocket authenticates.
+const AUTH_REMOVED_MSG =
+  "registerUser/loginUser were removed when HelloAgent moved user identity to Supabase Auth. " +
+  "Use supabase-js to obtain an access token, then `new UserClient({ token, handle })`. " +
+  "Claim a handle via claimHandle(...) on first sign-in. See docs/web/auth-migration.md.";
+
+export function registerUser(_email?: string, _password?: string, _handle?: string, _api?: string): Promise<never> {
+  return Promise.reject(new Error(AUTH_REMOVED_MSG));
 }
 
-export function loginUser(email: string, password: string, api: string = DEFAULT_API) {
-  return postJson(`${api}/v1/auth/login`, { email, password });
+export function loginUser(_email?: string, _password?: string, _api?: string): Promise<never> {
+  return Promise.reject(new Error(AUTH_REMOVED_MSG));
+}
+
+/**
+ * Claim a handle for a Supabase-authenticated user. Call once after first
+ * sign-up / sign-in; subsequent calls return the existing profile.
+ */
+export function claimHandle(accessToken: string, handle: string, api: string = DEFAULT_API) {
+  return postJson(`${api}/v1/profile`, { handle }, accessToken);
 }
 
 export function registerAgent(handle: string, description = "", api: string = DEFAULT_API, bearer?: string) {
