@@ -211,7 +211,10 @@ abstract class BaseConn {
     this.logger = logger ?? console;
   }
 
-  protected async connectOnce(): Promise<void> {
+  protected async connectOnce(authExtras?: {
+    sinceWireId?: string;
+    deviceId?: string;
+  }): Promise<void> {
     const WS = await resolveWebSocketCtor();
     const ws = new WS(this.relayUrl);
     this.ws = ws;
@@ -222,7 +225,17 @@ abstract class BaseConn {
     });
     const authFrame = encode({
       ...envBase(),
-      authRequest: { token: this.token, handle: this.handle, role: this.role },
+      authRequest: {
+        token: this.token,
+        handle: this.handle,
+        role: this.role,
+        // since_wire_id triggers Postgres-backed catch-up replay on
+        // the relay before live delivery starts. Empty string = no
+        // replay (server treats it as the pre-multi-client default).
+        // See docs/multi-client-sessions.md.
+        sinceWireId: authExtras?.sinceWireId ?? "",
+        deviceId: authExtras?.deviceId ?? "",
+      },
     });
     ws.send(authFrame);
     const first = await this.recvRaw();
@@ -492,8 +505,18 @@ export class UserClient extends BaseConn {
     super(handle, token, Role.ROLE_USER, opts.relayUrl, opts.logger);
   }
 
-  async connect() {
-    await this.connectOnce();
+  /**
+   * Open the WebSocket and complete the auth handshake.
+   *
+   * `opts.sinceWireId` enables multi-client catch-up replay: the relay
+   * replays any messages addressed to this user that were created
+   * after the supplied wire id, before going live. The caller is
+   * responsible for persisting the cursor (e.g., in localStorage) and
+   * for advancing it as inbound `SendMessage` envelopes are processed.
+   * See docs/multi-client-sessions.md.
+   */
+  async connect(opts?: { sinceWireId?: string; deviceId?: string }) {
+    await this.connectOnce(opts);
   }
 
   /** Stop and close the socket. */
