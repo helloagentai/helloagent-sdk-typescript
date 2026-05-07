@@ -20,7 +20,7 @@ if (!token || !peer) {
 
 const agent = new Agent({
   token,
-  relayUrl: process.env.HA_RELAY_WS ?? "wss://relay.helloagent.io/v1/ws",
+  relayUrl: process.env.HA_RELAY_WS ?? "wss://relay.helloagent.cc/v1/ws",
 });
 
 // Long-lived run loop — must be running for sends to work.

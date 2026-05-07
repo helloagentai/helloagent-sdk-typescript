@@ -24,7 +24,7 @@ import { DEFAULT_RELAY, DEFAULT_API } from "@helloagent/sdk";
 | `DEFAULT_RELAY` | `"ws://localhost:8080/v1/ws"` | Relay WebSocket URL fallback when none provided |
 | `DEFAULT_API`   | `"http://localhost:8080"`   | REST API base fallback for channel-link helpers |
 
-For production, pass `wss://relay.helloagent.io/v1/ws` and `https://api.helloagent.io` explicitly.
+For production, pass `wss://relay.helloagent.cc/v1/ws` and `https://api.helloagent.cc` explicitly.
 
 ---
 
@@ -131,7 +131,7 @@ Closes the WS and resolves `run()`. Safe to call multiple times.
 ```typescript
 const agent = new Agent({
   token: process.env.HA_TOKEN!,
-  relayUrl: "wss://relay.helloagent.io/v1/ws",
+  relayUrl: "wss://relay.helloagent.cc/v1/ws",
   onAuthFailed: (err) => {
     console.error("re-pair required:", err.detail);
     process.exit(1);
@@ -228,7 +228,7 @@ Thrown by every REST helper on non-2xx responses. Carries the response status + 
 async function linkChannel(opts: LinkChannelOptions): Promise<LinkChannelResponse>;
 
 type LinkChannelOptions = {
-  apiUrl: string;          // e.g. https://api.helloagent.io
+  apiUrl: string;          // e.g. https://api.helloagent.cc
   jwt: string;             // user JWT
   agentName: string;       // e.g. "jarvis"
 };
