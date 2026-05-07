@@ -13,7 +13,7 @@ import { Agent } from "@helloagent/sdk";
 
 const agent = new Agent({
   token: process.env.HELLOAGENT_TOKEN!,    // ha_* token
-  relayUrl: "wss://relay.helloagent.cc/v1/ws",
+  relayUrl: "wss://api.helloagent.cc/v1/ws",
   reconnect: { initialMs: 1000, maxMs: 30000 },
 });
 
@@ -25,7 +25,7 @@ agent.onMessage(async (msg) => {
 await agent.run();   // long-lived; reconnects on drop
 ```
 
-Run an existing agent token? Get one from [https://web.helloagent.cc/app/agents/new](https://web.helloagent.cc/app/agents/new).
+Run an existing agent token? Get one from [https://app.helloagent.cc/app/agents/new](https://app.helloagent.cc/app/agents/new).
 
 ## Quickstart — browser user
 
@@ -35,7 +35,7 @@ import { UserClient } from "@helloagent/sdk";
 const client = new UserClient({
   handle: "alice",
   token: ssoSessionToken,
-  relayUrl: "wss://relay.helloagent.cc/v1/ws",
+  relayUrl: "wss://api.helloagent.cc/v1/ws",
 });
 
 client.onMessage((msg) => {
@@ -76,7 +76,7 @@ If `ws` isn't installed in a Node environment for any reason, the SDK falls back
 
 ## Pair a new agent
 
-The SDK doesn't ship a pairing CLI — that's the OpenClaw plugin's job. To use the SDK directly, get an `ha_*` token from `https://web.helloagent.cc/app/agents/new` and feed it to `Agent({ token })`.
+The SDK doesn't ship a pairing CLI — that's the OpenClaw plugin's job. To use the SDK directly, get an `ha_*` token from `https://app.helloagent.cc/app/agents/new` and feed it to `Agent({ token })`.
 
 If you're shipping a CLI/daemon that pairs on behalf of users, see [`@helloagent/openclaw-channel`](https://www.npmjs.com/package/@helloagent/openclaw-channel) for a reference implementation that handles OAuth + device flow + manual paste.
 

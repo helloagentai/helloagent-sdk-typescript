@@ -129,7 +129,7 @@ export type ReconnectOptions = {
  * ```ts
  * const agent = new Agent({
  *   token: process.env.HA_TOKEN!,
- *   relayUrl: "wss://relay.helloagent.cc/v1/ws",
+ *   relayUrl: "wss://api.helloagent.cc/v1/ws",
  *   onAuthFailed: (err) => process.exit(1),
  * });
  * ```
@@ -490,7 +490,7 @@ export class Agent extends BaseConn {
  * const client = new UserClient({
  *   handle: "alice",
  *   token: ssoSessionToken,
- *   relayUrl: "wss://relay.helloagent.cc/v1/ws",
+ *   relayUrl: "wss://api.helloagent.cc/v1/ws",
  * });
  * client.onMessage((msg) => render(msg));
  * await client.run();

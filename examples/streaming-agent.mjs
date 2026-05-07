@@ -16,7 +16,7 @@ const agent = new Agent({
     console.error("set HA_TOKEN to your ha_* agent token");
     process.exit(1);
   })(),
-  relayUrl: process.env.HA_RELAY_WS ?? "wss://relay.helloagent.cc/v1/ws",
+  relayUrl: process.env.HA_RELAY_WS ?? "wss://api.helloagent.cc/v1/ws",
 });
 
 agent.onMessage(async function* (msg) {

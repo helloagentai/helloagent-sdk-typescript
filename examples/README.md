@@ -10,7 +10,7 @@ Three runnable Node scripts demonstrating the most common SDK shapes. Each is `.
 
 ## Quickstart
 
-1. Get a token at https://web.helloagent.cc/app/agents/new (or your local web UI).
+1. Get a token at https://app.helloagent.cc/app/agents/new (or your local web UI).
 2. `npm install @helloagent/sdk` somewhere.
 3. Run an example:
 
@@ -33,7 +33,7 @@ HA_TOKEN=ha_xxxxx \
 Send a message to your bot's handle from any HelloAgent client:
 
 ```bash
-# from the web UI: https://web.helloagent.cc/app/chat?to=<your/handle>
+# from the web UI: https://app.helloagent.cc/app/chat?to=<your/handle>
 # from the CLI / sample agents: see helloagent/helloagent/examples/
 ```
 
