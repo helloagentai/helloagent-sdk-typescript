@@ -48,12 +48,11 @@
   },
   "sideEffects": false,
   "scripts": {
-    "proto": "node node_modules/protobufjs-cli/bin/pbjs -t json-module -w es6 -o src/proto-bundle.js ../proto/helloagent/v1/protocol.proto && node scripts/patch-bundle.mjs",
+    "proto": "node node_modules/protobufjs-cli/bin/pbjs -t json-module -w es6 -o src/proto-bundle.js proto/helloagent/v1/protocol.proto && node scripts/patch-bundle.mjs",
     "build": "npm run proto && tsc",
     "typecheck": "tsc --noEmit",
     "prepublishOnly": "npm run build",
-    "echo": "tsx ../examples/ts_echo_agent.ts",
-    "smoke": "tsx ../examples/ts_smoke.ts"
+    "echo": "tsx examples/echo-agent.mjs"
   },
   "dependencies": {
     "protobufjs": "^8.0.3"

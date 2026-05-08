@@ -1,0 +1,86 @@
+syntax = "proto3";
+
+package helloagent.v1;
+
+option go_package = "github.com/helloagent/relay/helloagent/v1;helloagentv1";
+
+message Envelope {
+  string message_id = 1;
+  int64 ts_unix_ms = 2;
+  oneof payload {
+    AuthRequest auth_request = 10;
+    AuthResponse auth_response = 11;
+    SendMessage send_message = 12;
+    Ack ack = 13;
+    MessageDelivered delivered = 14;
+    StreamChunk stream_chunk = 15;
+    Error error = 16;
+  }
+}
+
+enum Role {
+  ROLE_UNSPECIFIED = 0;
+  ROLE_USER = 1;
+  ROLE_AGENT = 2;
+}
+
+message AuthRequest {
+  string token = 1;
+  string handle = 2;
+  Role role = 3;
+  // Optional. Last wire_id this client successfully received and
+  // processed. The server replays any messages addressed to `handle`
+  // that were created after this id, before subscribing the session
+  // to live delivery. Empty = no replay; behaves identically to the
+  // pre-multi-client server.
+  //
+  // Only honoured for ROLE_USER. Agents have NATS-backed durability
+  // via wire-Acks and do not need replay.
+  string since_wire_id = 4;
+  // Optional. Stable client-generated UUID identifying this device /
+  // browser tab. Currently informational (logging, observability);
+  // kept stable across reconnects on the same client.
+  string device_id = 5;
+}
+
+message AuthResponse {
+  bool ok = 1;
+  string session_id = 2;
+  string handle = 3;
+}
+
+message SendMessage {
+  string conversation_id = 1;
+  string from_handle = 2;
+  string to_handle = 3;
+  string text = 4;
+  // E2E payload. When is_encrypted is true, `text` MUST be empty; relay is
+  // expected to treat `encrypted_body` as opaque and never attempt to read it.
+  bytes encrypted_body = 5;
+  bool is_encrypted = 6;
+}
+
+message Ack {
+  string ref_message_id = 1;
+}
+
+message MessageDelivered {
+  string ref_message_id = 1;
+}
+
+message StreamChunk {
+  string conversation_id = 1;
+  string from_handle = 2;
+  string to_handle = 3;
+  string ref_message_id = 4;
+  string body = 5;
+  bool is_final = 6;
+  bytes encrypted_body = 7;
+  bool is_encrypted = 8;
+}
+
+message Error {
+  string code = 1;
+  string message = 2;
+  string ref_message_id = 3;
+}

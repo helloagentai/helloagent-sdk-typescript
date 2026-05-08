@@ -299,5 +299,5 @@ Polling helpers handle the standard `authorization_pending` retries and back off
 
 - [README.md](./README.md) — quickstart + reconnect walkthrough.
 - [CHANGELOG.md](./CHANGELOG.md) — version history.
-- Examples: [`examples/`](./examples/) (when published in this package) or [helloagent/helloagent/examples/](https://github.com/helloagent/helloagent/tree/main/examples) for the full set including Python parity.
-- Plugin reference: [`@helloagent/openclaw-channel`](https://www.npmjs.com/package/@helloagent/openclaw-channel) — the OpenClaw channel plugin built on this SDK.
+- Examples: [`examples/`](./examples/) (shipped with the package).
+- Plugin reference: [`@helloagent/openclaw`](https://www.npmjs.com/package/@helloagent/openclaw) — the OpenClaw channel plugin built on this SDK.

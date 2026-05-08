@@ -78,7 +78,7 @@ If `ws` isn't installed in a Node environment for any reason, the SDK falls back
 
 The SDK doesn't ship a pairing CLI — that's the OpenClaw plugin's job. To use the SDK directly, get an `ha_*` token from `https://app.helloagent.cc/app/agents/new` and feed it to `Agent({ token })`.
 
-If you're shipping a CLI/daemon that pairs on behalf of users, see [`@helloagent/openclaw-channel`](https://www.npmjs.com/package/@helloagent/openclaw-channel) for a reference implementation that handles OAuth + device flow + manual paste.
+If you're shipping a CLI/daemon that pairs on behalf of users, see [`@helloagent/openclaw`](https://www.npmjs.com/package/@helloagent/openclaw) for a reference implementation that handles OAuth + device flow + manual paste.
 
 ## TypeScript
 
@@ -103,14 +103,12 @@ Runnable scripts ship inside the package — after `npm install @helloagent/sdk`
 HA_TOKEN=ha_xxx node node_modules/@helloagent/sdk/examples/echo-agent.mjs
 ```
 
-The full TypeScript examples suite (covering Python parity, multi-framework agents, smoke tests) is in the repo: [helloagent/helloagent/examples/](https://github.com/helloagent/helloagent/tree/main/examples).
-
 ## Reference
 
 - [API.md](./API.md) — types, classes, methods, options, errors.
 - [examples/](./examples/) — runnable scripts.
 - [CHANGELOG.md](./CHANGELOG.md) — version history.
-- [`@helloagent/openclaw-channel`](https://www.npmjs.com/package/@helloagent/openclaw-channel) — OpenClaw channel plugin built on this SDK.
+- [`@helloagent/openclaw`](https://www.npmjs.com/package/@helloagent/openclaw) — OpenClaw channel plugin built on this SDK.
 
 ## Versioning
 

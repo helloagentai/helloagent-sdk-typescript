@@ -13,5 +13,5 @@
     "allowJs": true
   },
   "include": ["src/**/*.ts", "src/proto-bundle.js"],
-  "exclude": ["node_modules", "dist", "../examples"]
+  "exclude": ["node_modules", "dist"]
 }
