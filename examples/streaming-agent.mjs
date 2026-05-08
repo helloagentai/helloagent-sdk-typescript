@@ -9,7 +9,7 @@
  * Usage:
  *   HA_TOKEN=ha_xxx node streaming-agent.mjs
  */
-import { Agent } from "@helloagent/sdk";
+import { Agent } from "@helloagentai/sdk";
 
 const agent = new Agent({
   token: process.env.HA_TOKEN ?? (() => {

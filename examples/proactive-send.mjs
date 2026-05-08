@@ -9,7 +9,7 @@
  * Usage:
  *   HA_TOKEN=ha_xxx PEER=alice node proactive-send.mjs
  */
-import { Agent } from "@helloagent/sdk";
+import { Agent } from "@helloagentai/sdk";
 
 const token = process.env.HA_TOKEN;
 const peer = process.env.PEER;

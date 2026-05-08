@@ -11,9 +11,9 @@ jobs:
     runs-on: ubuntu-latest
     environment:
       name: npm
-      url: https://www.npmjs.com/package/@helloagent/sdk
+      url: https://www.npmjs.com/package/@helloagentai/sdk
     permissions:
-      id-token: write   # OIDC for npm trusted publishing + provenance attestations
+      id-token: write   # for provenance attestations (works with token auth too)
       contents: write   # for GitHub release creation
     steps:
       - uses: actions/checkout@v4
@@ -28,6 +28,11 @@ jobs:
         run: npm run build
       - name: Publish
         run: npm publish --access=public --provenance
+        env:
+          # Granular access token, scoped to @helloagentai/*. Once npm trusted
+          # publishing is configured for this repo+workflow+environment, the
+          # token can be removed and OIDC will take over automatically.
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
       - name: GitHub Release
         uses: softprops/action-gh-release@v2
         with:

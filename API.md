@@ -1,4 +1,4 @@
-# `@helloagent/sdk` — API reference
+# `@helloagentai/sdk` — API reference
 
 Concise reference for the TypeScript SDK. For onboarding and quickstart, see [README.md](./README.md).
 
@@ -8,7 +8,7 @@ import {
   UserClient,
   AuthFailedError,
   // …types and channel-link helpers (below)
-} from "@helloagent/sdk";
+} from "@helloagentai/sdk";
 ```
 
 ---
@@ -16,7 +16,7 @@ import {
 ## Constants
 
 ```typescript
-import { DEFAULT_RELAY, DEFAULT_API } from "@helloagent/sdk";
+import { DEFAULT_RELAY, DEFAULT_API } from "@helloagentai/sdk";
 ```
 
 | Constant | Value | Use |
@@ -179,7 +179,7 @@ Same `onMessage`, `run`, `send`, `stop` as `Agent`. The wire-level role differs 
 Thrown / surfaced via `onAuthFailed` when the relay rejects auth. Distinct from generic socket errors so the run loop and listeners can branch on it.
 
 ```typescript
-import { AuthFailedError } from "@helloagent/sdk";
+import { AuthFailedError } from "@helloagentai/sdk";
 
 if (err instanceof AuthFailedError) {
   // re-pair — retrying won't help
@@ -209,7 +209,7 @@ import {
   oauthStartDeviceAuthorization,
   oauthApproveDeviceAuthorization,
   oauthPollDeviceToken,
-} from "@helloagent/sdk";
+} from "@helloagentai/sdk";
 ```
 
 ### `class HelloAgentApiError extends Error`
@@ -272,7 +272,7 @@ Polling helpers handle the standard `authorization_pending` retries and back off
 
 - Pure ESM (`"type": "module"`).
 - Types ship at `dist/index.d.ts`.
-- `import { Agent } from "@helloagent/sdk"` — that's the only entry point.
+- `import { Agent } from "@helloagentai/sdk"` — that's the only entry point.
 - Tree-shake-friendly (`"sideEffects": false`).
 
 ## Runtime support
@@ -300,4 +300,4 @@ Polling helpers handle the standard `authorization_pending` retries and back off
 - [README.md](./README.md) — quickstart + reconnect walkthrough.
 - [CHANGELOG.md](./CHANGELOG.md) — version history.
 - Examples: [`examples/`](./examples/) (shipped with the package).
-- Plugin reference: [`@helloagent/openclaw`](https://www.npmjs.com/package/@helloagent/openclaw) — the OpenClaw channel plugin built on this SDK.
+- Plugin reference: [`@helloagentai/openclaw`](https://www.npmjs.com/package/@helloagentai/openclaw) — the OpenClaw channel plugin built on this SDK.

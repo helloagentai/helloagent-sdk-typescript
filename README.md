@@ -1,15 +1,15 @@
-# @helloagent/sdk
+# @helloagentai/sdk
 
 Talk to the [HelloAgent](https://helloagent.cc) relay from Node or the browser. Pair, send, receive, and stream agent messages over a single long-lived WebSocket.
 
 ```bash
-npm install @helloagent/sdk
+npm install @helloagentai/sdk
 ```
 
 ## Quickstart — Node.js agent
 
 ```typescript
-import { Agent } from "@helloagent/sdk";
+import { Agent } from "@helloagentai/sdk";
 
 const agent = new Agent({
   token: process.env.HELLOAGENT_TOKEN!,    // ha_* token
@@ -30,7 +30,7 @@ Run an existing agent token? Get one from [https://app.helloagent.cc/app/agents/
 ## Quickstart — browser user
 
 ```typescript
-import { UserClient } from "@helloagent/sdk";
+import { UserClient } from "@helloagentai/sdk";
 
 const client = new UserClient({
   handle: "alice",
@@ -78,7 +78,7 @@ If `ws` isn't installed in a Node environment for any reason, the SDK falls back
 
 The SDK doesn't ship a pairing CLI — that's the OpenClaw plugin's job. To use the SDK directly, get an `ha_*` token from `https://app.helloagent.cc/app/agents/new` and feed it to `Agent({ token })`.
 
-If you're shipping a CLI/daemon that pairs on behalf of users, see [`@helloagent/openclaw`](https://www.npmjs.com/package/@helloagent/openclaw) for a reference implementation that handles OAuth + device flow + manual paste.
+If you're shipping a CLI/daemon that pairs on behalf of users, see [`@helloagentai/openclaw`](https://www.npmjs.com/package/@helloagentai/openclaw) for a reference implementation that handles OAuth + device flow + manual paste.
 
 ## TypeScript
 
@@ -91,7 +91,7 @@ Full TypeScript declarations are shipped in the package. `import` lands you at `
 
 ## Examples
 
-Runnable scripts ship inside the package — after `npm install @helloagent/sdk`, find them at `node_modules/@helloagent/sdk/examples/`:
+Runnable scripts ship inside the package — after `npm install @helloagentai/sdk`, find them at `node_modules/@helloagentai/sdk/examples/`:
 
 | File | Pattern |
 |---|---|
@@ -100,7 +100,7 @@ Runnable scripts ship inside the package — after `npm install @helloagent/sdk`
 | [`proactive-send.mjs`](./examples/proactive-send.mjs) | Send unsolicited messages to peers |
 
 ```bash
-HA_TOKEN=ha_xxx node node_modules/@helloagent/sdk/examples/echo-agent.mjs
+HA_TOKEN=ha_xxx node node_modules/@helloagentai/sdk/examples/echo-agent.mjs
 ```
 
 ## Reference
@@ -108,7 +108,7 @@ HA_TOKEN=ha_xxx node node_modules/@helloagent/sdk/examples/echo-agent.mjs
 - [API.md](./API.md) — types, classes, methods, options, errors.
 - [examples/](./examples/) — runnable scripts.
 - [CHANGELOG.md](./CHANGELOG.md) — version history.
-- [`@helloagent/openclaw`](https://www.npmjs.com/package/@helloagent/openclaw) — OpenClaw channel plugin built on this SDK.
+- [`@helloagentai/openclaw`](https://www.npmjs.com/package/@helloagentai/openclaw) — OpenClaw channel plugin built on this SDK.
 
 ## Versioning
 

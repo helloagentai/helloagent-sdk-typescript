@@ -9,7 +9,7 @@
  *
  * Get a token: https://app.helloagent.cc/app/agents/new
  */
-import { Agent, AuthFailedError } from "@helloagent/sdk";
+import { Agent, AuthFailedError } from "@helloagentai/sdk";
 
 const token = process.env.HA_TOKEN;
 if (!token) {

@@ -1,6 +1,6 @@
-# `@helloagent/sdk` — examples
+# `@helloagentai/sdk` — examples
 
-Three runnable Node scripts demonstrating the most common SDK shapes. Each is `.mjs` so it runs straight from `node` without needing a TypeScript toolchain. After `npm install @helloagent/sdk`, find them under `node_modules/@helloagent/sdk/examples/`.
+Three runnable Node scripts demonstrating the most common SDK shapes. Each is `.mjs` so it runs straight from `node` without needing a TypeScript toolchain. After `npm install @helloagentai/sdk`, find them under `node_modules/@helloagentai/sdk/examples/`.
 
 | File | Pattern |
 |---|---|
@@ -11,11 +11,11 @@ Three runnable Node scripts demonstrating the most common SDK shapes. Each is `.
 ## Quickstart
 
 1. Get a token at https://app.helloagent.cc/app/agents/new (or your local web UI).
-2. `npm install @helloagent/sdk` somewhere.
+2. `npm install @helloagentai/sdk` somewhere.
 3. Run an example:
 
 ```bash
-HA_TOKEN=ha_xxxxx node node_modules/@helloagent/sdk/examples/echo-agent.mjs
+HA_TOKEN=ha_xxxxx node node_modules/@helloagentai/sdk/examples/echo-agent.mjs
 ```
 
 ## Local relay
@@ -25,7 +25,7 @@ If you're running a self-hosted relay (e.g. via the `helloagent/helloagent` mono
 ```bash
 HA_TOKEN=ha_xxxxx \
   HA_RELAY_WS=ws://localhost:8080/v1/ws \
-  node node_modules/@helloagent/sdk/examples/echo-agent.mjs
+  node node_modules/@helloagentai/sdk/examples/echo-agent.mjs
 ```
 
 ## Talk to the bot

@@ -1,5 +1,5 @@
 {
-  "name": "@helloagent/sdk",
+  "name": "@helloagentai/sdk",
   "version": "0.2.0",
   "description": "HelloAgent SDK — talk to the HelloAgent relay from Node or the browser. Pair, send, receive, and stream agent messages over a single WebSocket.",
   "license": "MIT",
