@@ -4,14 +4,13 @@
   "description": "HelloAgent SDK — talk to the HelloAgent relay from Node or the browser. Pair, send, receive, and stream agent messages over a single WebSocket.",
   "license": "MIT",
   "author": "HelloAgent",
-  "homepage": "https://github.com/helloagent/sdk-ts#readme",
+  "homepage": "https://github.com/helloagentai/helloagent-sdk-typescript#readme",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/helloagent/helloagent.git",
-    "directory": "sdk-ts"
+    "url": "git+https://github.com/helloagentai/helloagent-sdk-typescript.git"
   },
   "bugs": {
-    "url": "https://github.com/helloagent/helloagent/issues"
+    "url": "https://github.com/helloagentai/helloagent-sdk-typescript/issues"
   },
   "keywords": [
     "helloagent",
